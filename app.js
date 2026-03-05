@@ -35,14 +35,17 @@ async function testDBConnection() {
 
 testDBConnection()
 
+// Encode
 function encodeToken(token) {
   return Buffer.from(token).toString("base64url")
 }
 
+// Decode
 function decodeToken(encoded) {
   return Buffer.from(encoded, "base64url").toString("utf8")
 }
 
+// Generate QR
 app.get("/generate-qr/:userId", async (req, res) => {
   try {
     const userId = req.params.userId
