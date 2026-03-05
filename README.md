@@ -1,6 +1,6 @@
 # QR API
 
-A Node.js Express API for generating and scanning QR codes with Encoded Token authentication.
+A Node.js Express API for generating and scanning QR codes with Encoded Token Based authentication.
 
 ## Features
 
