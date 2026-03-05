@@ -1,0 +1,24 @@
+CREATE TABLE users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255),
+  phone VARCHAR(50)
+);
+
+CREATE TABLE qr_tokens (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT,
+  token VARCHAR(255) UNIQUE,
+  nonce VARCHAR(255) UNIQUE,
+  expires_at DATETIME,
+  used BOOLEAN DEFAULT FALSE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE qr_scan_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT,
+  qr_token_id INT,
+  pos_id INT,
+  success BOOLEAN,
+  scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
