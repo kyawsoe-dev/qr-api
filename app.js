@@ -8,6 +8,7 @@ const cors = require("cors")
 const app = express()
 app.use(express.json())
 app.use(cors())
+require('dotenv').config()
 
 const SECRET = process.env.QR_SECRET || "super_secret_key"
 
@@ -17,7 +18,22 @@ const db = mysql.createPool({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 })
+
+async function testDBConnection() {
+  try {
+    const [rows] = await db.query('SELECT 1 + 1 AS result')
+    console.log('Database connected successfully:', rows[0].result)
+  } catch (err) {
+    console.error('Database connection failed:', err)
+    process.exit(1)
+  }
+}
+
+testDBConnection()
 
 function encodeToken(token) {
   return Buffer.from(token).toString("base64url")
