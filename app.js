@@ -13,7 +13,7 @@ app.use(cors())
 const QR_TOKEN_SECRET = process.env.QR_TOKEN_SECRET || "QR_TOKEN_SECRET"
 const QR_KEY_SECRET = process.env.QR_KEY_SECRET || "QR_KEY_SECRET"
 
-
+// DB config
 const db = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -45,6 +45,7 @@ const QR_SECRET_KEY = crypto
 
 const ALGORITHM = "aes-256-cbc"
 
+// Encrypt
 function encrypt(text) {
   const iv = crypto.randomBytes(16)
 
@@ -56,6 +57,7 @@ function encrypt(text) {
   return iv.toString("hex") + ":" + encrypted
 }
 
+// Decrypt
 function decrypt(text) {
   const parts = text.split(":")
   const iv = Buffer.from(parts.shift(), "hex")
