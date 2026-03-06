@@ -76,37 +76,39 @@ app.get("/generate-qr/:userId", async (req, res) => {
   try {
     const userId = req.params.userId
 
-    const [existingRows] = await db.query(
-      "SELECT * FROM qr_tokens WHERE user_id=? AND used=0 AND expires_at > NOW()",
-      [userId]
-    )
-
-    if (existingRows.length > 0) {
-      const existingToken = existingRows[0].token
-
-      console.log(encrypt(existingToken), "encoded token");
-      
-      const qr = await QRCode.toDataURL(encrypt(existingToken))
-      return res.json({ qr })
-    }
-
     const nonce = uuidv4()
     const token = jwt.sign({ userId, nonce }, QR_TOKEN_SECRET, { expiresIn: "10m" })
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
 
-    await db.query(
-      `INSERT INTO qr_tokens (user_id, token, nonce, expires_at, used) 
-       VALUES (?, ?, ?, ?, 0)`,
-      [userId, token, nonce, expiresAt]
+    const [existingRows] = await db.query(
+      "SELECT id FROM qr_tokens WHERE user_id=? LIMIT 1",
+      [userId]
     )
+
+    if (existingRows.length > 0) {
+      await db.query(
+        `UPDATE qr_tokens 
+         SET token=?, nonce=?, expires_at=?, used=0
+         WHERE user_id=?`,
+        [token, nonce, expiresAt, userId]
+      )
+    } else {
+      await db.query(
+        `INSERT INTO qr_tokens (user_id, token, nonce, expires_at, used)
+         VALUES (?, ?, ?, ?, 0)`,
+        [userId, token, nonce, expiresAt]
+      )
+    }
 
     const qrData = encrypt(token)
 
     console.log(qrData, "QR Data");
     
+
     const qr = await QRCode.toDataURL(qrData)
 
     res.json({ qr })
+
   } catch (err) {
     console.error(err)
     res.status(500).json({ message: "QR generation failed" })
