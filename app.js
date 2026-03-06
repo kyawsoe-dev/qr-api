@@ -43,7 +43,7 @@ const QR_SECRET_KEY = crypto
   .update(QR_KEY_SECRET)
   .digest()
 
-const ALGORITHM = "aes-256-cbc"
+const ALGORITHM = process.env.ALGORITHM || "aes-256-cbc";
 
 // Encrypt
 function encrypt(text) {
