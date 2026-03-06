@@ -2,15 +2,17 @@ const express = require("express")
 const mysql = require("mysql2/promise")
 const QRCode = require("qrcode")
 const jwt = require("jsonwebtoken")
+const crypto = require("crypto")
 const { v4: uuidv4 } = require("uuid")
 const cors = require("cors")
-
+require('dotenv').config()
 const app = express()
 app.use(express.json())
 app.use(cors())
-require('dotenv').config()
 
-const SECRET = process.env.QR_SECRET || "super_secret_key"
+const QR_TOKEN_SECRET = process.env.QR_TOKEN_SECRET || "QR_TOKEN_SECRET"
+const QR_KEY_SECRET = process.env.QR_KEY_SECRET || "QR_KEY_SECRET"
+
 
 const db = mysql.createPool({
   host: process.env.DB_HOST,
@@ -25,7 +27,7 @@ const db = mysql.createPool({
 
 async function testDBConnection() {
   try {
-    const [rows] = await db.query('SELECT 1 + 1 AS result')
+    const [rows] = await db.query('SELECT 1 AS result')
     console.log('Database connected successfully:', rows[0].result)
   } catch (err) {
     console.error('Database connection failed:', err)
@@ -35,14 +37,36 @@ async function testDBConnection() {
 
 testDBConnection()
 
-// Encode
-function encodeToken(token) {
-  return Buffer.from(token).toString("base64url")
+
+const QR_SECRET_KEY = crypto
+  .createHash("sha256")
+  .update(QR_KEY_SECRET)
+  .digest()
+
+const ALGORITHM = "aes-256-cbc"
+
+function encrypt(text) {
+  const iv = crypto.randomBytes(16)
+
+  const cipher = crypto.createCipheriv(ALGORITHM, QR_SECRET_KEY, iv)
+
+  let encrypted = cipher.update(text, "utf8", "hex")
+  encrypted += cipher.final("hex")
+
+  return iv.toString("hex") + ":" + encrypted
 }
 
-// Decode
-function decodeToken(encoded) {
-  return Buffer.from(encoded, "base64url").toString("utf8")
+function decrypt(text) {
+  const parts = text.split(":")
+  const iv = Buffer.from(parts.shift(), "hex")
+  const encryptedText = parts.join(":")
+
+  const decipher = crypto.createDecipheriv(ALGORITHM, QR_SECRET_KEY, iv)
+
+  let decrypted = decipher.update(encryptedText, "hex", "utf8")
+  decrypted += decipher.final("utf8")
+
+  return decrypted
 }
 
 // Generate QR
@@ -58,14 +82,14 @@ app.get("/generate-qr/:userId", async (req, res) => {
     if (existingRows.length > 0) {
       const existingToken = existingRows[0].token
 
-      console.log(encodeToken(existingToken), "encoded token");
+      console.log(encrypt(existingToken), "encoded token");
       
-      const qr = await QRCode.toDataURL(encodeToken(existingToken))
+      const qr = await QRCode.toDataURL(encrypt(existingToken))
       return res.json({ qr })
     }
 
     const nonce = uuidv4()
-    const token = jwt.sign({ userId, nonce }, SECRET, { expiresIn: "10m" })
+    const token = jwt.sign({ userId, nonce }, QR_TOKEN_SECRET, { expiresIn: "10m" })
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000)
 
     await db.query(
@@ -74,7 +98,10 @@ app.get("/generate-qr/:userId", async (req, res) => {
       [userId, token, nonce, expiresAt]
     )
 
-    const qrData = encodeToken(token)
+    const qrData = encrypt(token)
+
+    console.log(qrData, "QR Data");
+    
     const qr = await QRCode.toDataURL(qrData)
 
     res.json({ qr })
@@ -86,16 +113,21 @@ app.get("/generate-qr/:userId", async (req, res) => {
 
 // Scan QR
 app.post("/scan-qr", async (req, res) => {
-  const { token: encodedToken, posId } = req.body
+  const { key: encodedToken, posId } = req.body
 
   if (!encodedToken) {
     return res.status(400).json({ message: "Token missing in request body" })
   }
 
   try {
-    const token = decodeToken(encodedToken)
+    const token = decrypt(encodedToken)
 
-    const payload = jwt.verify(token, SECRET)
+    console.log(token, "TOKEN");
+    
+    const payload = jwt.verify(token, QR_TOKEN_SECRET)
+
+    console.log(payload, "Payload");
+    
     const userId = payload.userId
     const nonce = payload.nonce
 
